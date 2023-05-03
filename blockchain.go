@@ -69,7 +69,15 @@ func NewBlockchain(address string) *Blockchain {
 
 // creates a new Blockchain with genesis Block
 func CreateBlockchain(address string) *Blockchain {
+	if dbExists() {
+		fmt.Println("Blockchain already exists.")
+		os.Exit(1)
+	}
+
 	var tip []byte
+
+	cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
+	genesis := NewGenesisBlock(cbtx)
 
 	db, err := bolt.Open(dbFile, 0600, nil)
 
@@ -78,39 +86,27 @@ func CreateBlockchain(address string) *Blockchain {
 	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(blocksBucket))
 
-		if b == nil {
-			fmt.Println("No existing blockchain found. Creating a new one...")
+		b, err := tx.CreateBucket([]byte(blocksBucket))
 
-			cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
-			genesis := NewGenesisBlock(cbtx)
-
-			b, err := tx.CreateBucket([]byte(blocksBucket))
-
-			if err != nil {
-				log.Panic(err)
-			}
-
-			err = b.Put(genesis.Hash, genesis.Serialize())
-			if err != nil {
-				log.Panic(err)
-			}
-
-			err = b.Put([]byte("l"), genesis.Hash)
-			if err != nil {
-				log.Panic(err)
-			}
-
-			tip = genesis.Hash
-
-		} else {
-			tip = b.Get([]byte("l"))
+		if err != nil {
+			log.Panic(err)
 		}
 
+		err = b.Put(genesis.Hash, genesis.Serialize())
+		if err != nil {
+			log.Panic(err)
+		}
+
+		err = b.Put([]byte("l"), genesis.Hash)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		tip = genesis.Hash
+
 		return nil
-	},
-	)
+	})
 
 	if err != nil {
 		log.Panic(err)
@@ -183,6 +179,8 @@ func (i *BlockchainIterator) Next() *Block {
 }
 
 func (bc *Blockchain) FindUTXOInTransactions(address string) map[string][]OutIndexAndData {
+	pubKeyHash := HashPubKey([]byte(address))
+
 	spentTXOs := make(map[string][]int)
 	unspentTXOs := make(map[string][]OutIndexAndData)
 
@@ -195,16 +193,16 @@ func (bc *Blockchain) FindUTXOInTransactions(address string) map[string][]OutInd
 
 			txId := hex.EncodeToString(tx.ID)
 
-		Work:
+		Outputs:
 			for index := range tx.Vout {
-				if !tx.Vout[index].CanBeUnlockedWith(address) {
+				if !tx.Vout[index].IsLockedWithKey(pubKeyHash) {
 					continue
 				}
 
 				for _, spentTXOIndex := range spentTXOs[txId] {
 					// this out has been used, so jump to the next out check
 					if spentTXOIndex == index {
-						continue Work
+						continue Outputs
 					}
 				}
 
