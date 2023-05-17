@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
+
+	"blockchainInGo/base58"
 )
 
 // IntToHex converts an int64 to a byte array
@@ -14,4 +16,11 @@ func IntToHex(num int64) []byte {
 		log.Panic(err)
 	}
 	return buff.Bytes()
+}
+
+func DecodeAddressToPubKeyHash(address string) []byte {
+	byteAddress := base58.Decode(address)
+	pubKeyHash := byteAddress[1 : len(byteAddress)-addressChecksumLen]
+
+	return pubKeyHash
 }

@@ -1,8 +1,9 @@
 package main
 
 import (
-	"blockchainInGo/base58"
 	"bytes"
+
+	"blockchainInGo/base58"
 )
 
 // TXOutput represents a transaction output
@@ -13,8 +14,8 @@ type TXOutput struct {
 
 // Lock signs the output
 func (out *TXOutput) Lock(address []byte) {
-	pubKeyHash := base58.Decode(string(address))
-	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-addressChecksumLen]
+	byteAddress := base58.Decode(string(address))
+	pubKeyHash := byteAddress[1 : len(byteAddress)-addressChecksumLen]
 
 	out.PubKeyHash = pubKeyHash
 }

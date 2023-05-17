@@ -9,13 +9,15 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const dbFile = "blockchain.db"
-const blocksBucket = "blocks"
-const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
+const (
+	dbFile              = "blockchain.db"
+	blocksBucket        = "blocks"
+	genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
+)
 
 // Blockchain keeps a sequence of blocks
 type Blockchain struct {
-	tip []byte //the head block's hash
+	tip []byte // the head block's hash
 	db  *bolt.DB
 }
 
@@ -46,7 +48,7 @@ func NewBlockchain(address string) *Blockchain {
 	}
 
 	var tip []byte
-	db, err := bolt.Open(dbFile, 0600, nil)
+	db, err := bolt.Open(dbFile, 0o600, nil)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -79,16 +81,13 @@ func CreateBlockchain(address string) *Blockchain {
 	cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
 	genesis := NewGenesisBlock(cbtx)
 
-	db, err := bolt.Open(dbFile, 0600, nil)
-
+	db, err := bolt.Open(dbFile, 0o600, nil)
 	if err != nil {
 		log.Panic(err)
 	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
-
 		b, err := tx.CreateBucket([]byte(blocksBucket))
-
 		if err != nil {
 			log.Panic(err)
 		}
@@ -115,7 +114,6 @@ func CreateBlockchain(address string) *Blockchain {
 	bc := Blockchain{tip, db}
 
 	return &bc
-
 }
 
 // saves provided data as a block in the blockchain
@@ -127,7 +125,6 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 		lastHash = b.Get([]byte("l"))
 		return nil
 	})
-
 	if err != nil {
 		log.Panic(err)
 	}
@@ -149,7 +146,6 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 		bc.tip = newBlock.Hash
 		return nil
 	})
-
 }
 
 func (bc *Blockchain) Iterator() *BlockchainIterator {
@@ -168,7 +164,6 @@ func (i *BlockchainIterator) Next() *Block {
 
 		block = DeserializeBlock(encodedBlock)
 		return nil
-
 	})
 	if err != nil {
 		log.Panic(err)
@@ -179,7 +174,7 @@ func (i *BlockchainIterator) Next() *Block {
 }
 
 func (bc *Blockchain) FindUTXOInTransactions(address string) map[string][]OutIndexAndData {
-	pubKeyHash := HashPubKey([]byte(address))
+	pubKeyHash := DecodeAddressToPubKeyHash(address)
 
 	spentTXOs := make(map[string][]int)
 	unspentTXOs := make(map[string][]OutIndexAndData)
@@ -232,7 +227,6 @@ func (bc *Blockchain) FindUTXO(address string) []TXOutput {
 
 	for _, outIndexAndData := range UtxoInTransactions {
 		for _, out := range outIndexAndData {
-
 			UtxoLs = append(UtxoLs, *out.out)
 		}
 	}
@@ -240,15 +234,14 @@ func (bc *Blockchain) FindUTXO(address string) []TXOutput {
 	return UtxoLs
 }
 
+// FindSpendableOutputs finds and returns unspent outputs to reference in inputs
 func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
-
 	UtxoInTransaction := bc.FindUTXOInTransactions(address)
 	unspentOutputs := make(map[string][]int)
 
 	var accumulated int
 Work:
 	for txId, outIndexAndDataLs := range UtxoInTransaction {
-
 		for _, outIndexAndData := range outIndexAndDataLs {
 			unspentOutputs[txId] = append(unspentOutputs[txId], outIndexAndData.i)
 			accumulated += outIndexAndData.out.Value
